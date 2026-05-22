@@ -1,15 +1,15 @@
-# SKILL: utiliser `laravel-raom-nuxt`
+# SKILL: use `laravel-raom-nuxt`
 
-Ce document sert de guide LLM pour intégrer rapidement le package dans un projet Nuxt.
+This document is an LLM guide to quickly integrate the package in a Nuxt project.
 
-## Objectif du package
+## Package purpose
 
-`laravel-raom-nuxt` fournit un object-mapper typé pour API Laravel REST (style ORM côté frontend) avec :
-- modèles décorés (`@Resource`, `@Field`, `@Key`)
-- query builder typé
+`laravel-raom-nuxt` provides a typed object mapper for Laravel REST APIs (ORM-like frontend style) with:
+- decorated models (`@Resource`, `@Field`, `@Key`)
+- typed query builder
 - relations (`HasMany`, `BelongsTo`, `HasOne`, `BelongsToMany`)
-- identity map et hydratation
-- suivi des mutations avec `save()`
+- identity map and hydration
+- mutation tracking with `save()`
 
 ## Installation
 
@@ -17,7 +17,7 @@ Ce document sert de guide LLM pour intégrer rapidement le package dans un proje
 npm install laravel-raom-nuxt
 ```
 
-Dans `nuxt.config.ts` :
+In `nuxt.config.ts`:
 
 ```ts
 export default defineNuxtConfig({
@@ -25,9 +25,9 @@ export default defineNuxtConfig({
 })
 ```
 
-## Import recommandé
+## Recommended import
 
-Importer depuis le runtime :
+Import from the runtime entry:
 
 ```ts
 import {
@@ -40,34 +40,34 @@ import {
 } from 'laravel-raom-nuxt/runtime'
 ```
 
-## Pattern modèle minimal
+## Minimal model pattern
 
-1. Décorer la classe avec `@Resource('endpoint')`
-2. Définir la clé primaire avec `@Key()` + `@Field()`
-3. Déclarer les champs avec `@Field()`
-4. Déclarer les relations via les builders (`HasMany`, `BelongsTo`, etc.)
+1. Decorate the class with `@Resource('endpoint')`
+2. Define the primary key with `@Key()` + `@Field()`
+3. Declare fields with `@Field()`
+4. Declare relations using relation builders (`HasMany`, `BelongsTo`, etc.)
 
-## Opérations principales
+## Main operations
 
-- Lecture:
+- Read:
   - `Model.query().where(...).include(...).get()`
   - `Model.query().findByKey(id)`
-- Création:
-  - `Model.new({ ... })` puis `save()`
-- Mise à jour:
-  - modifier les propriétés puis `save()`
+- Create:
+  - `Model.new({ ... })` then `save()`
+- Update:
+  - mutate properties then `save()`
 - Relations:
   - `attach`, `detach`, `sync`, `toggle`, `create`
-  - les mutations de relation sont différées jusqu’à `save()`
+  - relation mutations are deferred until `save()`
 
-## Contraintes importantes pour un agent LLM
+## Important constraints for an LLM agent
 
-- Toujours définir une ressource avec `@Resource` avant d’appeler `query()`, `hydrate()` ou `create()`.
-- Vérifier que les champs passés à `where`, `orderBy`, `select` existent dans les `@Field`.
-- Vérifier que les relations passées à `include` existent réellement sur le modèle.
-- Préférer l’import depuis `laravel-raom-nuxt/runtime` pour les API modèle/runtime.
+- Always define a resource with `@Resource` before calling `query()`, `hydrate()`, or `create()`.
+- Ensure fields passed to `where`, `orderBy`, and `select` exist in `@Field` metadata.
+- Ensure relations passed to `include` actually exist on the model.
+- Prefer imports from `laravel-raom-nuxt/runtime` for model/runtime APIs.
 
-## Validation locale du package
+## Local package validation
 
 ```bash
 npm run lint
@@ -75,4 +75,4 @@ npm run test
 npm run prepack
 ```
 
-Note: le projet nécessite une préparation Nuxt (`.nuxt/tsconfig.json`) avant certains checks.
+Note: this project requires Nuxt preparation (`.nuxt/tsconfig.json`) before some checks.
