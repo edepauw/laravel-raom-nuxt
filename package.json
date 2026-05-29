@@ -1,6 +1,6 @@
 {
     "name": "laravel-raom-nuxt",
-    "version": "0.3.6",
+    "version": "0.3.7",
     "description": "Nuxt module providing a typed object-mapper for Laravel REST API backends. Offers model classes with decorator-based field/key/relation metadata (@Resource, @Field, @Key), identity map, query builder, and relation builders (HasMany, BelongsTo, BelongsToMany, HasOne) with deferred mutation support.",
     "repository": "https://github.com/edepauw/laravel-raom-nuxt",
     "author": "edepauw",

@@ -10,6 +10,7 @@ import { snakeCaseToCamelCase } from '../utils/snakeCaseToCamelCase'
 
 type FilterOperator = '=' | '!=' | '>' | '<' | '>=' | '<=' | 'like' | 'not like' | 'in' | 'not in' | 'between' | 'not between'
 type FilterType = 'and' | 'or'
+type AggregateType = 'count' | 'sum' | 'avg' | 'min' | 'max' | 'exists'
 
 interface Filter {
   field: string
@@ -37,7 +38,7 @@ interface Include {
 
 interface Aggregate {
   relation: string
-  type: 'count' | 'sum' | 'avg' | 'min' | 'max'
+  type: AggregateType
   field?: string
   alias?: string
   filters?: Filter[]
@@ -249,7 +250,7 @@ export class QueryBuilder<T extends Model> {
    */
   aggregate(
     relation: string,
-    type: 'count' | 'sum' | 'avg' | 'min' | 'max',
+    type: AggregateType,
     field?: string,
     alias?: string,
     filters?: Filter[],
@@ -283,6 +284,10 @@ export class QueryBuilder<T extends Model> {
 
   withMax(relation: string, field: string, alias?: string, filters?: Filter[]): this {
     return this.aggregate(relation, 'max', field, alias, filters)
+  }
+  
+  withExists(relation: string, alias?: string, filters?: Filter[]): this {
+    return this.aggregate(relation, 'exists', undefined, alias, filters)
   }
 
   /**
