@@ -363,6 +363,47 @@ export abstract class Model {
     return mutateRes
   }
 
+  /**
+   * Persist several instances of the same resource in a single mutate request.
+   *
+   * Each instance is converted to one element of lomkit's `mutate` array, so a
+   * single round-trip can mix `create` and `update` operations (and their nested
+   * relation operations) the same way `save()` does for a single root.
+   *
+   * Instances with no pending changes are skipped. All instances must belong to
+   * the resource the method is called on.
+   */
+  static async mutate(models: Model[]): Promise<IMutateResponse> {
+    const endpoint = MetadataStorage.getResource(this as unknown as typeof Model).endpoint
+
+    const payloads: MutationPayload[] = []
+    for (const model of models) {
+      const modelEndpoint = model.getMeta().endpoint
+      if (modelEndpoint !== endpoint) {
+        throw new Error(`Model.mutate received an instance of resource '${modelEndpoint}' but was called on '${endpoint}'. A single mutate request targets one resource.`)
+      }
+
+      const payload = buildModelPayload(model)
+      if (payload) {
+        payloads.push(payload)
+      }
+    }
+
+    if (payloads.length === 0) {
+      return { created: [], updated: [] }
+    }
+
+    const mutateRes = await getCurrentFetch()<IMutateResponse>(`/${endpoint}/mutate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mutate: payloads }),
+    })
+
+    PayloadCache.invalidate(endpoint)
+    models.forEach(model => commitModelGraph(model))
+    return mutateRes
+  }
+
   async delete<T extends Model>(): Promise<{
     data: T[]
     meta: Record<string, unknown>

@@ -530,4 +530,48 @@ describe('Model', () => {
       ],
     })
   })
+
+  it('batches create and update operations of the same resource in a single mutate request', async () => {
+    ; (globalThis as unknown as G).$fetch.mockResolvedValueOnce({ created: [7], updated: [1] })
+
+    const created = Category.create({ name: 'New category' })
+    const updated = Category.hydrate({ id: 1, name: 'Old name' })
+    updated.name = 'Renamed category'
+
+    const res = await Category.mutate([created, updated])
+
+    const { url, body } = lastMutationRequest()
+    expect(url).toBe('/categories/mutate')
+    expect(body).toEqual({
+      mutate: [
+        { operation: 'create', attributes: { name: 'New category' } },
+        { operation: 'update', key: 1, attributes: { name: 'Renamed category' } },
+      ],
+    })
+    expect((globalThis as unknown as G).$fetch).toHaveBeenCalledTimes(1)
+    expect(res).toEqual({ created: [7], updated: [1] })
+
+    expect(created._isNew).toBe(false)
+    expect(updated._changes).toEqual({})
+    expect(updated._fields.name).toBe('Renamed category')
+  })
+
+  it('rejects a batch mixing instances of different resources', async () => {
+    const category = Category.create({ name: 'A' })
+    const product = Product.create({ name: 'B' })
+
+    await expect(Category.mutate([category, product])).rejects.toThrow(
+      'A single mutate request targets one resource.',
+    )
+    expect((globalThis as unknown as G).$fetch).not.toHaveBeenCalled()
+  })
+
+  it('is a no-op when no instance has pending changes', async () => {
+    const clean = Category.hydrate({ id: 2, name: 'Clean' })
+
+    const res = await Category.mutate([clean])
+
+    expect(res).toEqual({ created: [], updated: [] })
+    expect((globalThis as unknown as G).$fetch).not.toHaveBeenCalled()
+  })
 })
