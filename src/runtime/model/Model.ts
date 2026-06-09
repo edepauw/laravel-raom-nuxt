@@ -367,60 +367,44 @@ export abstract class Model {
     data: T[]
     meta: Record<string, unknown>
   } | null> {
-    try {
-      const endpoint = this.getMeta().endpoint
-      const fetch = getCurrentFetch()
-      const response = await fetch<{
-        data: T[]
-        meta: Record<string, unknown>
-      }>(`/${endpoint}`, {
-        method: 'DELETE',
-        body: JSON.stringify({ resources: [this.getKey()] }),
-      })
-      PayloadCache.invalidate(endpoint)
-      this._sharedMeta.isDeleted = true
-      return response
-    }
-    catch {
-      throw new Error('Delete operation failed. Make sure the model has a key and that the endpoint is correct.')
-    }
+    const endpoint = this.getMeta().endpoint
+    const fetch = getCurrentFetch()
+    const response = await fetch<{
+      data: T[]
+      meta: Record<string, unknown>
+    }>(`/${endpoint}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ resources: [this.getKey()] }),
+    })
+    PayloadCache.invalidate(endpoint)
+    this._sharedMeta.isDeleted = true
+    return response
   }
 
   static async details<T extends Model>(): Promise<IDetailsResponse<T>> {
-    try {
-      const fetch = getCurrentFetch()
-      const response = await fetch<IDetailsResponse<T>>(`/${this.getMeta().endpoint}`, {
-        method: 'GET',
-      })
-      return response
-    }
-    catch {
-      throw new Error('Details operation failed. Make sure the endpoint is correct.')
-    }
+    const fetch = getCurrentFetch()
+    return await fetch<IDetailsResponse<T>>(`/${this.getMeta().endpoint}`, {
+      method: 'GET',
+    })
   }
 
   static async actions<T extends Model>(actionName: string, fields?: IActionField[], queryCallback?: (query: QueryBuilder<T>) => void): Promise<IActionResponse> {
-    try {
-      const fetch = getCurrentFetch()
+    const fetch = getCurrentFetch()
 
-      let searchPayload = {} as SearchPayload
-      if (queryCallback) {
-        const query = (this.getMeta().target as typeof Model).query<T>()
-        queryCallback(query)
-        searchPayload = query.buildPayload()
-      }
-
-      const response = await fetch<IActionResponse>(`/${this.getMeta().endpoint}/actions/${actionName}`, {
-        method: 'POST',
-        body: JSON.stringify({
-          fields,
-          search: searchPayload.search
-        }),
-      })
-      return response
-    } catch {
-      throw new Error(`Action ${actionName} failed. Make sure the model has a key, that the endpoint is correct, and that the action exists.`)
+    let searchPayload = {} as SearchPayload
+    if (queryCallback) {
+      const query = (this.getMeta().target as typeof Model).query<T>()
+      queryCallback(query)
+      searchPayload = query.buildPayload()
     }
+
+    return await fetch<IActionResponse>(`/${this.getMeta().endpoint}/actions/${actionName}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        fields,
+        search: searchPayload.search
+      }),
+    })
   }
 
   deeplyGeneratePayload() {

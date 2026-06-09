@@ -1,7 +1,8 @@
 import { reactive } from 'vue'
 import type { Model } from './Model'
+import type { ModelCollection } from './ModelCollection'
 
-export class ModelList<T extends Model> implements Iterable<T> {
+export class ModelList<T extends Model> implements ModelCollection<T> {
   readonly [index: number]: T
   private readonly items: T[]
 
