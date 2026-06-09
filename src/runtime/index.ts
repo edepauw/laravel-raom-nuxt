@@ -16,6 +16,7 @@ export {
 export { Model } from './model/Model'
 export { DraftModel } from './model/DraftModel'
 export { ModelList } from './model/ModelList'
+export type { ModelCollection } from './model/ModelCollection'
 export { hydrate } from './model/hydrate'
 
 // Query builders

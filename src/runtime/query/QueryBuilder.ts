@@ -3,6 +3,7 @@ import { MetadataStorage } from '../core/metadata'
 import { hydrate } from '../model/hydrate'
 import type { Model } from '../model/Model'
 import { ModelList } from '../model/ModelList'
+import type { ModelCollection } from '../model/ModelCollection'
 import { PayloadCache } from '../cache/payloadCache'
 import getCurrentFetch from '../helpers/getCurrentFetch'
 import type { ISearchResponse } from '../types/search'
@@ -12,10 +13,13 @@ type FilterOperator = '=' | '!=' | '>' | '<' | '>=' | '<=' | 'like' | 'not like'
 type FilterType = 'and' | 'or'
 type AggregateType = 'count' | 'sum' | 'avg' | 'min' | 'max' | 'exists'
 
+type Scalar = string | number | boolean | null
+type FilterValue = Scalar | Scalar[]
+
 interface Filter {
   field: string
   operator?: FilterOperator
-  value: any
+  value: FilterValue
   type?: FilterType
 }
 
@@ -46,7 +50,7 @@ interface Aggregate {
 
 interface Instruction {
   name: string
-  fields?: Array<{ name: string, value: any }>
+  fields?: Array<{ name: string, value: unknown }>
 }
 
 export interface SearchPayload {
@@ -58,7 +62,7 @@ export interface SearchPayload {
     sorts?: Sort[]
     selects?: Array<{ field: string }>
     includes?: Include[]
-    scopes?: Array<{ name: string, parameters?: any[] }>
+    scopes?: Array<{ name: string, parameters?: unknown[] }>
     aggregates?: Aggregate[]
     instructions?: Instruction[]
     gates?: string[]
@@ -77,7 +81,7 @@ export class QueryBuilder<T extends Model> {
   private sorts: Sort[] = []
   private selects: string[] = []
   private includes: Include[] = []
-  private scopes: Array<{ name: string, parameters?: any[] }> = []
+  private scopes: Array<{ name: string, parameters?: unknown[] }> = []
   private aggregates: Aggregate[] = []
   private instructions: Instruction[] = []
   private gates: string[] = []
@@ -155,7 +159,7 @@ export class QueryBuilder<T extends Model> {
   /**
    * Inclut des relations
    */
-  include(relation: keyof T | string, callback?: (q: QueryBuilder<any>) => void): this {
+  include(relation: keyof T | string, callback?: (q: QueryBuilder<Model>) => void): this {
     const relationMeta = this.findDistantRelation(relation as string)
 
     const include: Include = {
@@ -163,7 +167,7 @@ export class QueryBuilder<T extends Model> {
     }
 
     if (callback) {
-      const includeBuilder = new QueryBuilder<any>(relationMeta.target)
+      const includeBuilder = new QueryBuilder<Model>(relationMeta.target)
       callback(includeBuilder)
       Object.assign(include, includeBuilder.buildPayload().search)
     }
@@ -175,7 +179,7 @@ export class QueryBuilder<T extends Model> {
   /**
    * Filtre simple (AND par défaut)
    */
-  where(field: keyof T | string, operator: FilterOperator | any, value?: any): this {
+  where(field: keyof T | string, operator: FilterOperator | FilterValue, value?: FilterValue): this {
     // Si seulement 2 args, operator est la valeur
     if (value === undefined) {
       value = operator
@@ -195,7 +199,7 @@ export class QueryBuilder<T extends Model> {
   /**
    * Filtre OR
    */
-  orWhere(field: keyof T | string, operator: FilterOperator | any, value?: any): this {
+  orWhere(field: keyof T | string, operator: FilterOperator | FilterValue, value?: FilterValue): this {
     if (value === undefined) {
       value = operator
       operator = '='
@@ -240,7 +244,7 @@ export class QueryBuilder<T extends Model> {
   /**
    * Applique un scope Laravel
    */
-  scope(name: string, ...parameters: any[]): this {
+  scope(name: string, ...parameters: unknown[]): this {
     this.scopes.push({ name, parameters })
     return this
   }
@@ -293,7 +297,7 @@ export class QueryBuilder<T extends Model> {
   /**
    * Ajoute une instruction personnalisée
    */
-  instruction(name: string, fields?: Array<{ name: string, value: any }>): this {
+  instruction(name: string, fields?: Array<{ name: string, value: unknown }>): this {
     this.instructions.push({ name, fields })
     return this
   }
@@ -381,7 +385,7 @@ export class QueryBuilder<T extends Model> {
   /**
    * Exécute la recherche et retourne les résultats
    */
-  async get(): Promise<[ModelList<T> | T[], Omit<ISearchResponse<T>, 'data'>]> {
+  async get(): Promise<[ModelCollection<T>, Omit<ISearchResponse<T>, 'data'>]> {
     const payload = this.buildPayload()
     const url = `${this.resource.endpoint}/search`
     const body = JSON.stringify(payload)
@@ -410,7 +414,7 @@ export class QueryBuilder<T extends Model> {
     const data = Array.isArray(response.data) ? response.data : []
     const { data: _ignoredData, ...searchMeta } = response
 
-    let ret: ModelList<T> | T[]
+    let ret: ModelCollection<T>
     if (import.meta.server) {
       ret = data
     }
@@ -429,7 +433,7 @@ export class QueryBuilder<T extends Model> {
   /**
    * Exécute la recherche et retourne les résultats
    */
-  async getPage(page: number): Promise<[ModelList<T> | T[], Omit<ISearchResponse<T>, 'data'>]> {
+  async getPage(page: number): Promise<[ModelCollection<T>, Omit<ISearchResponse<T>, 'data'>]> {
     this.page(page)
     return await this.get()
   }
@@ -440,13 +444,13 @@ export class QueryBuilder<T extends Model> {
   async first(): Promise<T | null> {
     this.checkLimit(1)
     const [results] = await this.get()
-    return Array.isArray(results) ? (results.at(0) as T | null) ?? null : (results.at(0) ?? null)
+    return results.at(0) ?? null
   }
 
   /**
    * Trouve une ressource par sa clé primaire
    */
-  async findByKey(id: any): Promise<T> {
+  async findByKey(id: string | number): Promise<T> {
     this.where(this.resource.key || 'id', '=', id)
 
     const response = await this.first()

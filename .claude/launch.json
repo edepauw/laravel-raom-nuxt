@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "docs",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "cd docs && export PATH=\"$HOME/.nvm/versions/node/v22.22.3/bin:$PATH\"; exec \"$HOME/.nvm/versions/node/v20.0.0/bin/pnpm\" dev"
+      ],
+      "port": 3000
+    }
+  ]
+}
