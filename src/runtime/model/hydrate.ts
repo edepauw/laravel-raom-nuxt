@@ -1,4 +1,3 @@
-import { reactive, ref, type Ref } from 'vue'
 import { IdentityMap } from '../core/identityMap'
 import { MetadataStorage } from '../core/metadata'
 import { isRelationBuilder } from '../relations'
@@ -96,10 +95,15 @@ export function hydrate<T extends Model>(resourceClass: new () => T, data: any):
   if (keyValue !== undefined && keyValue !== null) {
     const existing = IdentityMap.get(resourceClass, keyValue)
     if (!existing) {
-      const reactiveFields = reactive(instance._fields)
-      const reactiveSharedMeta = reactive({ isDeleted: false })
-      instance._sharedMeta = reactiveSharedMeta
-      IdentityMap.set(resourceClass, keyValue, { fields: reactiveFields, sharedMeta: reactiveSharedMeta })
+      // _fields and _sharedMeta are already reactive (created in the Model
+      // constructor). Share the instance's own reactive objects through the
+      // identity map so this instance — and every later one for the same key —
+      // observe the same reactive state. Previously a reactive copy was stored
+      // here while the instance kept its raw _fields, so reads were not tracked.
+      IdentityMap.set(resourceClass, keyValue, {
+        fields: instance._fields,
+        sharedMeta: instance._sharedMeta,
+      })
     }
   }
   return instance

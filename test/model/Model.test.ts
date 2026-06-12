@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { effect, isReactive } from 'vue'
 import { Resource } from '../../src/runtime/core/decorators/class/Resource'
 import { Field } from '../../src/runtime/core/decorators/property/Field'
 import { Key } from '../../src/runtime/core/decorators/property/Key'
@@ -149,6 +150,38 @@ describe('Model', () => {
     product.applyChanges()
     expect(product._fields.name).toBe('Pending name')
     expect(product._changes).toEqual({})
+  })
+
+  it('keeps field reads reactive across pending changes and applyChanges', () => {
+    const product = Product.hydrate({ id: 99, name: 'Initial' })
+
+    expect(isReactive(product._fields)).toBe(true)
+    expect(isReactive(product._changes)).toBe(true)
+
+    let observed: string | undefined
+    let runs = 0
+    effect(() => {
+      runs++
+      observed = product.name as string
+    })
+
+    expect(observed).toBe('Initial')
+
+    // A pending edit lands in _changes and must notify readers tracking the field.
+    const runsBeforeEdit = runs
+    product.name = 'Edited'
+    expect(observed).toBe('Edited')
+    expect(runs).toBeGreaterThan(runsBeforeEdit)
+
+    // Promoting changes to persisted fields keeps the value and stays reactive.
+    product.applyChanges()
+    expect(product.name).toBe('Edited')
+    expect(product._fields.name).toBe('Edited')
+
+    const runsBeforeSecondEdit = runs
+    product.name = 'Edited again'
+    expect(observed).toBe('Edited again')
+    expect(runs).toBeGreaterThan(runsBeforeSecondEdit)
   })
 
   it('hydrate resets _isDeleted', () => {

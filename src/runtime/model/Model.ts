@@ -7,7 +7,7 @@ import { isRelationBuilder } from '../relations'
 import { PayloadCache } from '../cache/payloadCache'
 import type { IDetailsResponse } from '../types/details'
 import type { IActionField, IActionResponse } from '../types/actions'
-import { reactive, ref } from 'vue'
+import { reactive } from 'vue'
 import type { IMutateResponse } from '../types/mutate'
 import { snakeCaseToCamelCase } from '../utils/snakeCaseToCamelCase'
 
@@ -31,8 +31,8 @@ export type SharedMeta = {
 export abstract class Model {
   _sharedMeta = reactive<SharedMeta>({ isDeleted: false })
   _isNew = false
-  _fields: Record<string, unknown> = {}
-  _changes: Record<string, unknown> = {}
+  _fields: Record<string, unknown> = reactive<Record<string, unknown>>({})
+  _changes: Record<string, unknown> = reactive<Record<string, unknown>>({})
   _parentRelations: ParentRelationLink[] = []
   _bypassProxy = false
 
@@ -44,8 +44,21 @@ export abstract class Model {
         if (typeof property === 'string' && property.startsWith('_')) {
           return target[property as keyof Model]
         }
-        if (typeof property === 'string' && Object.prototype.hasOwnProperty.call(target._fields, property)) {
-          return target._fields[property]
+        if (typeof property === 'string') {
+          // Read both pending changes and persisted fields so Vue registers a
+          // reactive dependency on each, regardless of which one currently
+          // holds the value. Without touching _changes here, editing a field
+          // that only existed in _fields would land in the untracked _changes
+          // key and never notify readers — i.e. "model.name n'est plus réactif".
+          const pendingValue = target._changes[property]
+          const persistedValue = target._fields[property]
+
+          if (Object.prototype.hasOwnProperty.call(target._changes, property)) {
+            return pendingValue
+          }
+          if (Object.prototype.hasOwnProperty.call(target._fields, property)) {
+            return persistedValue
+          }
         }
 
         return Reflect.get(target, property, receiver)
@@ -129,14 +142,24 @@ export abstract class Model {
    */
   applyChanges() {
     Object.assign(this._fields, this._changes)
-    this._changes = {}
+    this.clearChanges()
   }
 
   /**
    * Drop all pending changes and keep persisted fields unchanged.
    */
   discardChanges() {
-    this._changes = {}
+    this.clearChanges()
+  }
+
+  /**
+   * Empty pending changes in place, preserving the reactive object identity
+   * so existing Vue dependencies on _changes keep firing.
+   */
+  private clearChanges() {
+    for (const key of Object.keys(this._changes)) {
+      delete this._changes[key]
+    }
   }
 
   /**
