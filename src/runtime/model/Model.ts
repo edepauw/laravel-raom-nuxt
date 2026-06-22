@@ -366,21 +366,28 @@ export abstract class Model {
   /**
    * Persist several instances of the same resource in a single mutate request.
    *
-   * Each instance is converted to one element of lomkit's `mutate` array, so a
-   * single round-trip can mix `create` and `update` operations (and their nested
-   * relation operations) the same way `save()` does for a single root.
+   * Mirrors the instance `save()` but for a batch. Accepts instances, arrays of
+   * instances, or any mix of both — so you can pass your lists straight through
+   * without spreading:
+   *   `User.save(userA, userB)`
+   *   `User.save(editedUsers, newUsers)`
+   *   `User.save(editedUsers, draftUser)`
+   * Each instance becomes one element of lomkit's `mutate` array, so a single
+   * round-trip can mix `create` and `update` operations (and their nested
+   * relation operations).
    *
    * Instances with no pending changes are skipped. All instances must belong to
    * the resource the method is called on.
    */
-  static async mutate(models: Model[]): Promise<IMutateResponse> {
+  static async save(...models: (Model | Model[])[]): Promise<IMutateResponse> {
     const endpoint = MetadataStorage.getResource(this as unknown as typeof Model).endpoint
+    const instances = models.flat()
 
     const payloads: MutationPayload[] = []
-    for (const model of models) {
+    for (const model of instances) {
       const modelEndpoint = model.getMeta().endpoint
       if (modelEndpoint !== endpoint) {
-        throw new Error(`Model.mutate received an instance of resource '${modelEndpoint}' but was called on '${endpoint}'. A single mutate request targets one resource.`)
+        throw new Error(`Model.save received an instance of resource '${modelEndpoint}' but was called on '${endpoint}'. A single mutate request targets one resource.`)
       }
 
       const payload = buildModelPayload(model)
@@ -400,7 +407,7 @@ export abstract class Model {
     })
 
     PayloadCache.invalidate(endpoint)
-    models.forEach(model => commitModelGraph(model))
+    instances.forEach(model => commitModelGraph(model))
     return mutateRes
   }
 
