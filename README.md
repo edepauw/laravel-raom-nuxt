@@ -111,6 +111,82 @@ user.posts.sync(10, { withoutDetaching: true })
 await user.save()
 ```
 
+## Creating, updating & deleting ✍️
+
+Mutations follow the same dirty-tracking model as a classic ORM: you mutate instances in memory, and nothing hits the network until you `save()`. Changes are committed to the persisted state **only after** the backend confirms the mutation.
+
+### Creating
+
+`create()` (alias `new()`) returns a draft instance. Its first `save()` issues a `create`; later saves issue `update`.
+
+```ts
+const post = Post.create({ title: 'Hello world' })
+await post.save() // POST /posts/mutate → { mutate: [{ operation: 'create', attributes: { title: 'Hello world' } }] }
+```
+
+### Updating
+
+Field writes are tracked as pending changes via a proxy and persisted on `save()`. Relation mutations (`attach`, `detach`, `sync`, `toggle`, `create`) are deferred the same way.
+
+```ts
+const post = await Post.query().findByKey(1)
+
+post.title = 'Updated title' // staged in _changes, not yet persisted
+await post.save() // POST /posts/mutate → { mutate: [{ operation: 'update', key: 1, attributes: { title: 'Updated title' } }] }
+```
+
+A `save()` with nothing pending is a no-op — no request is sent.
+
+### Deleting
+
+```ts
+const post = await Post.query().findByKey(1)
+await post.delete() // DELETE /posts → { resources: [1] }
+```
+
+`delete()` marks the instance as deleted, removes it from the identity map, and invalidates the resource's payload cache.
+
+### Batch save — many instances in one request 🚀
+
+`instance.save()` persists a single root (and its nested relation graph). When you have **several independent instances of the same resource** to persist — typically an edited list plus some freshly created drafts — use the static `Model.save(...)` instead. It serialises every instance into one lomkit `mutate` array, so a **single round-trip** can mix `create` and `update` operations.
+
+It is variadic and flattens its arguments, so you can pass instances, arrays of instances, or any mix — without spreading:
+
+```ts
+const draft = Category.create({ name: 'New category' })
+
+const edited = await Category.query().findByKey(1)
+edited.name = 'Renamed category'
+
+// One request mixing create + update
+await Category.save(draft, edited)
+
+// Pass your lists straight through
+await Category.save(editedCategories, newCategories)
+await Category.save([editedCategory], draftCategory)
+```
+
+The example above sends a single request:
+
+```jsonc
+// POST /categories/mutate
+{
+  "mutate": [
+    { "operation": "create", "attributes": { "name": "New category" } },
+    { "operation": "update", "key": 1, "attributes": { "name": "Renamed category" } }
+  ]
+}
+```
+
+Behaviour:
+
+- 🎯 **One resource per request** — every instance must belong to the resource the method is called on. A batch mixing different resources throws.
+- 🧹 **Unchanged instances are skipped** — if nothing has pending changes, no request is sent and it resolves to `{ created: [], updated: [] }`.
+- 🔄 **Same commit semantics as `save()`** — on success the whole graph is committed (drafts become persisted, changes are flushed) and the resource's payload cache is invalidated.
+- 🧬 Each instance carries its own nested relation operations, exactly like a single `save()`.
+
+It returns lomkit's mutate response: `{ created: [...keys], updated: [...keys] }`.
+
 ## Identity Map 🧠
 
 Without an identity map, multiple API calls can produce multiple JS instances for the same resource.
